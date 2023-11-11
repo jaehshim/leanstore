@@ -30,16 +30,16 @@ struct RocksDB {
    // -------------------------------------------------------------------------------------
    RocksDB(DB_TYPE type = DB_TYPE::DB) : type(type)
    {
-      wo.disableWAL = true;
-      wo.sync = false;
+      // wo.disableWAL = true;
+      // wo.sync = false;
       // -------------------------------------------------------------------------------------
       rocksdb::Options db_options;
-      db_options.use_direct_reads = true;
-      db_options.use_direct_io_for_flush_and_compaction = true;
+      // db_options.use_direct_reads = true;
+      // db_options.use_direct_io_for_flush_and_compaction = true;
       db_options.db_write_buffer_size = 0;  // disabled
       // db_options.write_buffer_size = 64 * 1024 * 1024; keep the default
       db_options.create_if_missing = true;
-      db_options.manual_wal_flush = true;
+      // db_options.manual_wal_flush = true;
       db_options.compression = rocksdb::CompressionType::kNoCompression;
       // db_options.OptimizeLevelStyleCompaction(FLAGS_dram_gib * 1024 * 1024 * 1024);
       db_options.row_cache = rocksdb::NewLRUCache(FLAGS_dram_gib * 1024 * 1024 * 1024);
