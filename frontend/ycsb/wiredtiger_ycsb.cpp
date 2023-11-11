@@ -26,6 +26,7 @@ DEFINE_uint32(ycsb_payload_size, 100, "tuple size in bytes");
 DEFINE_uint32(ycsb_warmup_rounds, 0, "");
 DEFINE_bool(ycsb_single_statement_tx, true, "");
 DEFINE_bool(ycsb_count_unique_lookup_keys, true, "");
+DEFINE_uint32(ycsb_scan, 0, "");
 // -------------------------------------------------------------------------------------
 DEFINE_bool(print_header, true, "");
 // -------------------------------------------------------------------------------------
@@ -33,7 +34,7 @@ thread_local WT_SESSION* WiredTigerDB::session = nullptr;
 thread_local WT_CURSOR* WiredTigerDB::cursor[20] = {nullptr};
 // -------------------------------------------------------------------------------------
 using YCSBKey = u64;
-using YCSBPayload = BytesPayload<120>;
+using YCSBPayload = BytesPayload<4096>;
 using YCSBTable = Relation<YCSBKey, YCSBPayload>;
 // -------------------------------------------------------------------------------------
 double calculateMTPS(chrono::high_resolution_clock::time_point begin, chrono::high_resolution_clock::time_point end, u64 factor)
@@ -46,6 +47,7 @@ int main(int argc, char** argv)
 {
    gflags::SetUsageMessage("WiredTiger TPC-C");
    gflags::ParseCommandLineFlags(&argc, &argv, true);
+   cout << "WiredTiger YCSB" << endl;
    // -------------------------------------------------------------------------------------
    chrono::high_resolution_clock::time_point begin, end;
    // -------------------------------------------------------------------------------------
@@ -58,6 +60,9 @@ int main(int argc, char** argv)
                                     : FLAGS_target_gib * 1024 * 1024 * 1024 * 1.0 / 2.0 / (sizeof(YCSBKey) + sizeof(YCSBPayload));
    if(!FLAGS_recover) {
      cout << "Inserting " << ycsb_tuple_count << " values" << endl;
+     cout << "Tuple size is " << sizeof(YCSBPayload) << endl;
+     cout << "Ratio is " << FLAGS_ycsb_read_ratio << endl;
+     cout << "Scan length is " << FLAGS_ycsb_scan << endl;
      begin = chrono::high_resolution_clock::now();
      leanstore::utils::Parallelize::range(FLAGS_worker_threads, ycsb_tuple_count, [&](u64 t_i, u64 begin, u64 end) {
        wiredtiger_db.prepareThread();
@@ -102,7 +107,21 @@ int main(int argc, char** argv)
                assert(key < ycsb_tuple_count);
                YCSBPayload result;
                if (FLAGS_ycsb_read_ratio == 100 || leanstore::utils::RandomGenerator::getRandU64(0, 100) < FLAGS_ycsb_read_ratio) {
-                  table.lookup1({key}, [&](const YCSBTable&) {});  // result = record.my_payload;
+                  if (FLAGS_ycsb_scan == 0) {
+                     table.lookup1({key}, [&](const YCSBTable&) {});  // result = record.my_payload;
+                  } else {
+                     u64 scan_counter = 0;
+                     table.scan(
+                        {key},
+                        [&](const YCSBTable::Key& found_key, const YCSBTable& found_value) {
+                           scan_counter++;
+                           if (scan_counter >= FLAGS_ycsb_scan) {
+                              return false;
+                           }
+                           return true;
+                        },
+                        [&]() {});
+                  }
                } else {
                   UpdateDescriptorGenerator1(tabular_update_descriptor, YCSBTable, my_payload);
                   leanstore::utils::RandomGenerator::getRandString(reinterpret_cast<u8*>(&result), sizeof(YCSBPayload));
@@ -124,16 +143,21 @@ int main(int argc, char** argv)
          cout << "t,tag,oltp_committed,oltp_aborted" << endl;
       }
       u64 time = 0;
+      u64 count_commited = 0;
+      u64 count_aborted = 0;
       while (keep_running) {
          u64 total_committed = 0, total_aborted = 0;
          for (u64 t_i = 0; t_i < FLAGS_worker_threads; t_i++) {
             total_committed += thread_committed[t_i].exchange(0);
             total_aborted += thread_aborted[t_i].exchange(0);
          }
+         count_commited += total_committed;
+         count_aborted += total_aborted;
          cout << time++ << "," << FLAGS_tag << "," << total_committed << "," << total_aborted << endl;
          sleep(1);
       }
       running_threads_counter--;
+      printf("total time: %ld, oltp per second: %.2lf\n", time, (double)count_commited/time);
    });
    // Shutdown threads
    sleep(FLAGS_run_for_seconds);
