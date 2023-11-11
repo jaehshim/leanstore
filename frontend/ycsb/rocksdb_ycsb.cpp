@@ -28,6 +28,7 @@ DEFINE_bool(ycsb_single_statement_tx, true, "");
 DEFINE_bool(ycsb_count_unique_lookup_keys, true, "");
 DEFINE_string(rocks_db, "none", "none/pessimistic/optimistic");
 DEFINE_uint32(ycsb_scan, 0, "");
+DEFINE_bool(ycsb_insert, false, "");
 // -------------------------------------------------------------------------------------
 DEFINE_bool(print_header, true, "");
 // -------------------------------------------------------------------------------------
@@ -73,8 +74,9 @@ int main(int argc, char** argv)
    if(!FLAGS_recover) {
      cout << "Inserting " << ycsb_tuple_count << " values" << endl;
      cout << "Tuple size is " << sizeof(YCSBPayload) << endl;
-     cout << "Ratio is " << FLAGS_ycsb_read_ratio << endl;
+     cout << "Read Ratio is " << FLAGS_ycsb_read_ratio << endl;
      cout << "Scan length is " << FLAGS_ycsb_scan << endl;
+     cout << "Perform insert instead of update? " << FLAGS_ycsb_insert << endl;
      begin = chrono::high_resolution_clock::now();
      leanstore::utils::Parallelize::range(FLAGS_worker_threads, ycsb_tuple_count, [&](u64 t_i, u64 begin, u64 end) {
        for (u64 i = begin; i < end; i++) {
@@ -111,6 +113,7 @@ int main(int argc, char** argv)
       // -------------------------------------------------------------------------------------
       threads.emplace_back([&, t_i] {
          running_threads_counter++;
+         u64 insert_counter = ycsb_tuple_count;
          while (keep_running) {
             jumpmuTry()
             {
@@ -142,10 +145,16 @@ int main(int argc, char** argv)
 
                   operation_type = 1; // read operation
                } else {
-                  UpdateDescriptorGenerator1(tabular_update_descriptor, YCSBTable, my_payload);
                   leanstore::utils::RandomGenerator::getRandString(reinterpret_cast<u8*>(&result), sizeof(YCSBPayload));
-                  table.update1(
-                      {key}, [&](YCSBTable& rec) { rec.my_payload = result; }, tabular_update_descriptor);
+                  if (! FLAGS_ycsb_insert) {
+                     UpdateDescriptorGenerator1(tabular_update_descriptor, YCSBTable, my_payload);
+                     table.update1(
+                        {key}, [&](YCSBTable& rec) { rec.my_payload = result; }, tabular_update_descriptor);
+                  } else {
+                     YCSBKey& insert_key = insert_counter;
+                     table.insert1({insert_key}, {result}, t_i);
+                     insert_counter++;
+                  }
 
                   operation_type = 2; // write operation
                }

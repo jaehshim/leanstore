@@ -59,6 +59,7 @@ class Adapter
                          std::function<void()> reset_if_scan_failed_cb) = 0;
    // -------------------------------------------------------------------------------------
    virtual void insert(const typename Record::Key& key, const Record& record) = 0;
+   virtual void insert1(const typename Record::Key& key, const Record& record, const u64 t_i) = 0;
    // -------------------------------------------------------------------------------------
    virtual void lookup1(const typename Record::Key& key, const std::function<void(const Record&)>& callback) = 0;
    // -------------------------------------------------------------------------------------

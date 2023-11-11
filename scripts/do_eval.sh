@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ $# -lt 2 ]; then
+	echo "Usage $0 [DB name] [Read ratio] {Scan Length} {Insert flag}"
+	exit -1
+fi
+
 #TARGET="rocksdb"
 #TARGET="wiredtiger"
 TARGET=$1
@@ -24,13 +29,18 @@ MNT="/mnt/nvme"
 DEV="nvme0n1"
 
 RATIO=$2
-
 SCAN=$3
+INSERT=$4
+
 if [ -z "$3" ]
 then
 	SCAN=0
 fi
-echo $TARGET $RATIO $SCAN
+if [ -z "$4" ]
+then
+	INSERT=0
+fi
+echo $TARGET $RATIO $SCAN $INSERT
 
 function do_init() {
 	echo "drop cache & sync & sleep"
@@ -54,7 +64,7 @@ function do_init() {
 do_init
 #sleep 30
 
-sudo LD_LIBRARY_PATH=$LIBRARY_PATH $BENCH_PATH --ssd_path=$MNT --dram_gib=4 --worker_threads=8 --run_for_seconds=60 --ycsb_tuple_count=8372255 --ycsb_read_ratio=$RATIO --ycsb_scan=$SCAN | tee results/$TARGET"_"$RATIO
+sudo LD_LIBRARY_PATH=$LIBRARY_PATH $BENCH_PATH --ssd_path=$MNT --dram_gib=4 --worker_threads=8 --run_for_seconds=60 --ycsb_tuple_count=8372255 --ycsb_read_ratio=$RATIO --ycsb_scan=$SCAN --ycsb_insert=$INSERT| tee results/$TARGET"_"$RATIO"_"$SCAN"_"$INSERT
 
 
 ## FOR BENCHMARK ON DIRTY DB ##

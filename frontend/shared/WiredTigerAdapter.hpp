@@ -105,6 +105,36 @@ struct WiredTigerAdapter : public Adapter<Record> {
       }
       error_check(ret);
    }
+   void insert1(const typename Record::Key& key, const Record& record, const u64 t_i) final
+   {
+      u8 folded_key[Record::maxFoldLength()];
+      const u32 folded_key_len = Record::foldKey(folded_key, key);
+      int ret;
+      // -------------------------------------------------------------------------------------
+      folded_key[0] = t_i; // make unique key for each thread
+      // -------------------------------------------------------------------------------------
+      if (map.cursor[Record::id] == nullptr) {
+         ret = map.session->open_cursor(map.session, table_name.c_str(), NULL, "raw", &map.cursor[Record::id]);
+         error_check(ret);
+      }
+      WT_CURSOR* cursor = map.cursor[Record::id];
+      // -------------------------------------------------------------------------------------
+      WT_ITEM key_item;
+      key_item.data = folded_key;
+      key_item.size = folded_key_len;
+      WT_ITEM payload_item;
+      payload_item.data = &record;
+      payload_item.size = sizeof(record);
+      // -------------------------------------------------------------------------------------
+      cursor->set_key(cursor, &key_item);
+      cursor->set_value(cursor, &payload_item);
+      ret = cursor->insert(cursor);
+      if (ret == WT_ROLLBACK) {
+         error_check(map.session->rollback_transaction(map.session, NULL));
+         jumpmu::jump();
+      }
+      error_check(ret);
+   }
    // -------------------------------------------------------------------------------------
    void lookup1(const typename Record::Key& key, const std::function<void(const Record&)>& fn) final
    {

@@ -108,6 +108,25 @@ struct RocksDBAdapter : public Adapter<Record> {
          }
       }
    }
+   void insert1(const typename Record::Key& key, const Record& record, const u64 t_i) final
+   {
+      u8 folded_key[Record::maxFoldLength() + sizeof(SEP)];
+      const u32 folded_key_len = fold(folded_key, Record::id) + Record::foldKey(folded_key + sizeof(SEP), key);
+      // -------------------------------------------------------------------------------------
+      folded_key[sizeof(SEP)] = t_i; // make unique key for each thread
+      // -------------------------------------------------------------------------------------
+      rocksdb::Status s;
+      if (map.type == RocksDB::DB_TYPE::DB) {
+         s = map.db->Put(map.wo, RSlice(folded_key, folded_key_len), RSlice(&record, sizeof(record)));
+         ensure(s.ok());
+      } else {
+         s = map.txn->Put(RSlice(folded_key, folded_key_len), RSlice(&record, sizeof(record)));
+         if (!s.ok()) {
+            map.txn->Rollback();
+            jumpmu::jump();
+         }
+      }
+   }
    // -------------------------------------------------------------------------------------
    void lookup1(const typename Record::Key& key, const std::function<void(const Record&)>& fn) final
    {
