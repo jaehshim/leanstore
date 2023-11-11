@@ -7,6 +7,7 @@
 #include "leanstore/storage/btree/core/WALMacros.hpp"
 #include "leanstore/utils/JumpMU.hpp"
 #include "rocksdb/db.h"
+#include "rocksdb/table.h"
 #include "rocksdb/utilities/optimistic_transaction_db.h"
 #include "rocksdb/utilities/transaction_db.h"
 // -------------------------------------------------------------------------------------
@@ -42,7 +43,11 @@ struct RocksDB {
       // db_options.manual_wal_flush = true;
       db_options.compression = rocksdb::CompressionType::kNoCompression;
       // db_options.OptimizeLevelStyleCompaction(FLAGS_dram_gib * 1024 * 1024 * 1024);
-      db_options.row_cache = rocksdb::NewLRUCache(FLAGS_dram_gib * 1024 * 1024 * 1024);
+      // db_options.row_cache = rocksdb::NewLRUCache(FLAGS_dram_gib * 1024 * 1024 * 1024);
+      rocksdb::BlockBasedTableOptions table_options;
+      table_options.block_cache = rocksdb::NewLRUCache(FLAGS_dram_gib * 1024 * 1024 * 1024);
+      db_options.table_factory.reset(rocksdb::NewBlockBasedTableFactory(table_options));
+
       rocksdb::Status s;
       if (type == DB_TYPE::DB) {
          s = rocksdb::DB::Open(db_options, FLAGS_ssd_path, &db);
