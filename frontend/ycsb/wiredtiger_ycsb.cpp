@@ -102,7 +102,6 @@ int main(int argc, char** argv)
          while (keep_running) {
             jumpmuTry()
             {
-               wiredtiger_db.startTX();
                YCSBKey key;
                if (FLAGS_zipf_factor == 0) {
                   key = leanstore::utils::RandomGenerator::getRandU64(0, ycsb_tuple_count);
@@ -111,6 +110,7 @@ int main(int argc, char** argv)
                }
                assert(key < ycsb_tuple_count);
                YCSBPayload result;
+               wiredtiger_db.startTX();
                if (FLAGS_ycsb_read_ratio == 100 || leanstore::utils::RandomGenerator::getRandU64(0, 100) < FLAGS_ycsb_read_ratio) {
                   if (FLAGS_ycsb_scan == 0) {
                      table.lookup1({key}, [&](const YCSBTable&) {});  // result = record.my_payload;
