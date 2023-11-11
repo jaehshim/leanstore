@@ -86,10 +86,15 @@ int main(int argc, char** argv)
    atomic<bool> keep_running = true;
    atomic<u64> running_threads_counter = 0;
    std::atomic<u64> thread_committed[FLAGS_worker_threads];
+   std::atomic<u64> thread_read_committed[FLAGS_worker_threads];
+   std::atomic<u64> thread_write_committed[FLAGS_worker_threads];
    std::atomic<u64> thread_aborted[FLAGS_worker_threads];
    for (u64 t_i = 0; t_i < FLAGS_worker_threads; t_i++) {
       thread_committed[t_i] = 0;
+      thread_read_committed[t_i] = 0;
+      thread_write_committed[t_i] = 0;
       thread_aborted[t_i] = 0;
+      int operation_type = 0;
       // -------------------------------------------------------------------------------------
       threads.emplace_back([&, t_i] {
          running_threads_counter++;
@@ -122,14 +127,23 @@ int main(int argc, char** argv)
                         },
                         [&]() {});
                   }
+
+                  operation_type = 1; // read operation
                } else {
                   UpdateDescriptorGenerator1(tabular_update_descriptor, YCSBTable, my_payload);
                   leanstore::utils::RandomGenerator::getRandString(reinterpret_cast<u8*>(&result), sizeof(YCSBPayload));
                   table.update1(
                       {key}, [&](YCSBTable& rec) { rec.my_payload = result; }, tabular_update_descriptor);
+                  
+                  operation_type = 2; // write operation
                }
                wiredtiger_db.commitTX();
                thread_committed[t_i]++;
+               if (operation_type == 1) {
+                  thread_read_committed[t_i]++;
+               } else {
+                  thread_write_committed[t_i]++;
+               }
             }
             jumpmuCatch() { thread_aborted[t_i]++; }
          }
@@ -144,20 +158,29 @@ int main(int argc, char** argv)
       }
       u64 time = 0;
       u64 count_commited = 0;
+      u64 count_read_commited = 0;
+      u64 count_write_commited = 0;
       u64 count_aborted = 0;
       while (keep_running) {
-         u64 total_committed = 0, total_aborted = 0;
+         u64 total_committed = 0, total_aborted = 0, total_read_committed = 0, total_write_committed = 0;
          for (u64 t_i = 0; t_i < FLAGS_worker_threads; t_i++) {
             total_committed += thread_committed[t_i].exchange(0);
+            total_read_committed += thread_read_committed[t_i].exchange(0);
+            total_write_committed += thread_write_committed[t_i].exchange(0);
             total_aborted += thread_aborted[t_i].exchange(0);
          }
          count_commited += total_committed;
+         count_read_commited += total_read_committed;
+         count_write_commited += total_write_committed;
          count_aborted += total_aborted;
          cout << time++ << "," << FLAGS_tag << "," << total_committed << "," << total_aborted << endl;
          sleep(1);
       }
       running_threads_counter--;
       printf("total time: %ld, oltp per second: %.2lf\n", time, (double)count_commited/time);
+      printf("total operations: %ld \n", count_commited);
+      printf("total read operations: %ld \n", count_read_commited);
+      printf("total write operations: %ld \n", count_write_commited);
    });
    // Shutdown threads
    sleep(FLAGS_run_for_seconds);
