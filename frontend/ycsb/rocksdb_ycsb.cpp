@@ -28,7 +28,7 @@ DEFINE_bool(ycsb_single_statement_tx, true, "");
 DEFINE_bool(ycsb_count_unique_lookup_keys, true, "");
 DEFINE_string(rocks_db, "none", "none/pessimistic/optimistic");
 DEFINE_uint32(ycsb_scan, 0, "");
-DEFINE_bool(ycsb_insert, false, "");
+DEFINE_uint32(ycsb_write_type, 3, "");
 // -------------------------------------------------------------------------------------
 DEFINE_bool(print_header, true, "");
 // -------------------------------------------------------------------------------------
@@ -72,12 +72,12 @@ int main(int argc, char** argv)
                                     ? FLAGS_ycsb_tuple_count
                                     : FLAGS_target_gib * 1024 * 1024 * 1024 * 1.0 / 2.0 / (sizeof(YCSBKey) + sizeof(YCSBPayload));
    if(!FLAGS_recover) {
-     cout << "Inserting " << ycsb_tuple_count << " values" << endl;
-     cout << "Tuple size is " << sizeof(YCSBPayload) << endl;
-     cout << "Read Ratio is " << FLAGS_ycsb_read_ratio << endl;
-     cout << "Scan length is " << FLAGS_ycsb_scan << endl;
-     cout << "Perform insert instead of update? " << FLAGS_ycsb_insert << endl;
-     begin = chrono::high_resolution_clock::now();
+      cout << "Inserting " << ycsb_tuple_count << " values" << endl;
+      cout << "Tuple size is " << sizeof(YCSBPayload) << endl;
+      cout << "Read Ratio is " << FLAGS_ycsb_read_ratio << endl;
+      cout << "Write type (1: update, 2: insert, 3: rmw) is " << FLAGS_ycsb_write_type << endl;
+      cout << "Scan length is " << FLAGS_ycsb_scan << endl;
+      begin = chrono::high_resolution_clock::now();
    //   leanstore::utils::Parallelize::range(FLAGS_worker_threads, ycsb_tuple_count, [&](u64 t_i, u64 begin, u64 end) {
    //     for (u64 i = begin; i < end; i++) {
    //       YCSBPayload payload;
@@ -89,14 +89,14 @@ int main(int argc, char** argv)
    //     }
    //   });
       leanstore::utils::Parallelize::parallelRange(ycsb_tuple_count, [&](u64 begin, u64 end) {
-       for (u64 i = begin; i < end; i++) {
-         YCSBPayload payload;
-         leanstore::utils::RandomGenerator::getRandString(reinterpret_cast<u8*>(&payload), sizeof(YCSBPayload));
-         YCSBKey& key = i;
-         rocks_db.startTX();
-         table.insert({key}, {payload});
-         rocks_db.commitTX();
-       }
+         for (u64 i = begin; i < end; i++) {
+            YCSBPayload payload;
+            leanstore::utils::RandomGenerator::getRandString(reinterpret_cast<u8*>(&payload), sizeof(YCSBPayload));
+            YCSBKey& key = i;
+            rocks_db.startTX();
+            table.insert({key}, {payload});
+            rocks_db.commitTX();
+         }
      });
      end = chrono::high_resolution_clock::now();
      cout << "time elapsed = " << (chrono::duration_cast<chrono::microseconds>(end - begin).count() / 1000000.0) << endl;
@@ -156,14 +156,16 @@ int main(int argc, char** argv)
                   operation_type = 1; // read operation
                } else {
                   leanstore::utils::RandomGenerator::getRandString(reinterpret_cast<u8*>(&result), sizeof(YCSBPayload));
-                  if (! FLAGS_ycsb_insert) {
-                     UpdateDescriptorGenerator1(tabular_update_descriptor, YCSBTable, my_payload);
-                     table.update1(
-                        {key}, [&](YCSBTable& rec) { rec.my_payload = result; }, tabular_update_descriptor);
-                  } else {
+                  if (FLAGS_ycsb_write_type == 1) { // Update
+                     table.insert({key}, {result});
+                  } else if (FLAGS_ycsb_write_type == 2) { // Insert
                      YCSBKey& insert_key = insert_counter;
                      table.insert1({insert_key}, {result}, t_i);
                      insert_counter++;
+                  } else { // Read-Modify-Write
+                     UpdateDescriptorGenerator1(tabular_update_descriptor, YCSBTable, my_payload);
+                     table.update1(
+                        {key}, [&](YCSBTable& rec) { rec.my_payload = result; }, tabular_update_descriptor);
                   }
 
                   operation_type = 2; // write operation
