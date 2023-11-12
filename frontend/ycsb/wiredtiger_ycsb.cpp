@@ -35,7 +35,7 @@ thread_local WT_SESSION* WiredTigerDB::session = nullptr;
 thread_local WT_CURSOR* WiredTigerDB::cursor[20] = {nullptr};
 // -------------------------------------------------------------------------------------
 using YCSBKey = u64;
-using YCSBPayload = BytesPayload<4096>;
+using YCSBPayload = BytesPayload<1024>;
 using YCSBTable = Relation<YCSBKey, YCSBPayload>;
 // -------------------------------------------------------------------------------------
 double calculateMTPS(chrono::high_resolution_clock::time_point begin, chrono::high_resolution_clock::time_point end, u64 factor)
@@ -66,7 +66,16 @@ int main(int argc, char** argv)
      cout << "Scan length is " << FLAGS_ycsb_scan << endl;
      cout << "Perform insert instead of update? " << FLAGS_ycsb_insert << endl;
      begin = chrono::high_resolution_clock::now();
-     leanstore::utils::Parallelize::range(FLAGS_worker_threads, ycsb_tuple_count, [&](u64 t_i, u64 begin, u64 end) {
+   //   leanstore::utils::Parallelize::range(FLAGS_worker_threads, ycsb_tuple_count, [&](u64 t_i, u64 begin, u64 end) {
+   //     wiredtiger_db.prepareThread();
+   //     for (u64 i = begin; i < end; i++) {
+   //       YCSBPayload payload;
+   //       leanstore::utils::RandomGenerator::getRandString(reinterpret_cast<u8*>(&payload), sizeof(YCSBPayload));
+   //       YCSBKey& key = i;
+   //       table.insert({key}, {payload});
+   //     }
+   //   });
+     leanstore::utils::Parallelize::parallelRange(ycsb_tuple_count, [&](u64 begin, u64 end) {
        wiredtiger_db.prepareThread();
        for (u64 i = begin; i < end; i++) {
          YCSBPayload payload;

@@ -33,7 +33,7 @@ DEFINE_bool(ycsb_insert, false, "");
 DEFINE_bool(print_header, true, "");
 // -------------------------------------------------------------------------------------
 using YCSBKey = u64;
-using YCSBPayload = BytesPayload<4096>;
+using YCSBPayload = BytesPayload<1024>;
 using YCSBTable = Relation<YCSBKey, YCSBPayload>;
 // -------------------------------------------------------------------------------------
 thread_local rocksdb::Transaction* RocksDB::txn = nullptr;
@@ -78,7 +78,17 @@ int main(int argc, char** argv)
      cout << "Scan length is " << FLAGS_ycsb_scan << endl;
      cout << "Perform insert instead of update? " << FLAGS_ycsb_insert << endl;
      begin = chrono::high_resolution_clock::now();
-     leanstore::utils::Parallelize::range(FLAGS_worker_threads, ycsb_tuple_count, [&](u64 t_i, u64 begin, u64 end) {
+   //   leanstore::utils::Parallelize::range(FLAGS_worker_threads, ycsb_tuple_count, [&](u64 t_i, u64 begin, u64 end) {
+   //     for (u64 i = begin; i < end; i++) {
+   //       YCSBPayload payload;
+   //       leanstore::utils::RandomGenerator::getRandString(reinterpret_cast<u8*>(&payload), sizeof(YCSBPayload));
+   //       YCSBKey& key = i;
+   //       rocks_db.startTX();
+   //       table.insert({key}, {payload});
+   //       rocks_db.commitTX();
+   //     }
+   //   });
+      leanstore::utils::Parallelize::parallelRange(ycsb_tuple_count, [&](u64 begin, u64 end) {
        for (u64 i = begin; i < end; i++) {
          YCSBPayload payload;
          leanstore::utils::RandomGenerator::getRandString(reinterpret_cast<u8*>(&payload), sizeof(YCSBPayload));
