@@ -68,15 +68,16 @@ int main(int argc, char** argv)
    rocks_db.prepareThread();
    RocksDBAdapter<YCSBTable> table(rocks_db);
    // -------------------------------------------------------------------------------------
+   cout << "Tuple size is (" << sizeof(YCSBKey) << ", " << sizeof(YCSBPayload) << ")" << endl;
+   cout << "Read Ratio is " << FLAGS_ycsb_read_ratio << endl;
+   cout << "Write type (1: update, 2: insert, 3: rmw) is " << FLAGS_ycsb_write_type << endl;
+   cout << "Scan length is " << FLAGS_ycsb_scan << endl;
+   // -------------------------------------------------------------------------------------
    const u64 ycsb_tuple_count = (FLAGS_ycsb_tuple_count)
                                     ? FLAGS_ycsb_tuple_count
                                     : FLAGS_target_gib * 1024 * 1024 * 1024 * 1.0 / 2.0 / (sizeof(YCSBKey) + sizeof(YCSBPayload));
    if(!FLAGS_recover) {
       cout << "Inserting " << ycsb_tuple_count << " values" << endl;
-      cout << "Tuple size is " << sizeof(YCSBPayload) << endl;
-      cout << "Read Ratio is " << FLAGS_ycsb_read_ratio << endl;
-      cout << "Write type (1: update, 2: insert, 3: rmw) is " << FLAGS_ycsb_write_type << endl;
-      cout << "Scan length is " << FLAGS_ycsb_scan << endl;
       begin = chrono::high_resolution_clock::now();
    //   leanstore::utils::Parallelize::range(FLAGS_worker_threads, ycsb_tuple_count, [&](u64 t_i, u64 begin, u64 end) {
    //     for (u64 i = begin; i < end; i++) {
