@@ -24,23 +24,28 @@ else
 	exit
 fi
 
-
 MNT="/mnt/nvme"
 DEV="nvme0n1"
 
+TUPLES=33554432
+#TUPLES=8372255
+#TUPLES=16744510
+TIME=60
+
 RATIO=$2
-SCAN=$3
-INSERT=$4
+WRITE_TYPE=$3 # 1: update, 2: insert, 3: RMW
+SCAN=$4
 
 if [ -z "$3" ]
 then
-	SCAN=0
+	WRITE_TYPE=3
 fi
 if [ -z "$4" ]
 then
-	INSERT=0
+	SCAN=0
 fi
-echo $TARGET $RATIO $SCAN $INSERT
+
+echo $TARGET $RATIO $WRITE_TYPE $SCAN
 
 function do_init() {
 	echo "drop cache & sync & sleep"
@@ -62,16 +67,15 @@ function do_init() {
 }
 
 do_init
-#sleep 30
+sleep 10
 
-sudo LD_LIBRARY_PATH=$LIBRARY_PATH $BENCH_PATH --ssd_path=$MNT --dram_gib=4 --worker_threads=8 --run_for_seconds=60 --ycsb_tuple_count=8372255 --ycsb_read_ratio=$RATIO --ycsb_scan=$SCAN --ycsb_insert=$INSERT| tee results/$TARGET"_"$RATIO"_"$SCAN"_"$INSERT
+sudo LD_LIBRARY_PATH=$LIBRARY_PATH $BENCH_PATH --ssd_path=$MNT --dram_gib=4 --worker_threads=8 --run_for_seconds=$TIME --ycsb_tuple_count=$TUPLES --ycsb_read_ratio=$RATIO --ycsb_scan=$SCAN --ycsb_write_type=$WRITE_TYPE | tee results/$TARGET"_"$RATIO"_"$SCAN"_"$WRITE_TYPE
 
 
 ## FOR BENCHMARK ON DIRTY DB ##
-#sudo LD_LIBRARY_PATH=$LIBRARY_PATH $BENCH_PATH --ssd_path=$MNT --dram_gib=4 --worker_threads=8 --run_for_seconds=60 --ycsb_tuple_count=8372255 --ycsb_read_ratio=0 --ycsb_scan=$SCAN | tee results/$TARGET"_"$RATIO
-#sudo LD_LIBRARY_PATH=$LIBRARY_PATH $BENCH_PATH --recover --ssd_path=$MNT --dram_gib=4 --worker_threads=8 --run_for_seconds=60 --ycsb_tuple_count=8372255 --ycsb_read_ratio=0 --ycsb_scan=$SCAN | tee results/$TARGET"_"$RATIO
-#sudo LD_LIBRARY_PATH=$LIBRARY_PATH $BENCH_PATH --recover --ssd_path=$MNT --dram_gib=4 --worker_threads=8 --run_for_seconds=60 --ycsb_tuple_count=8372255 --ycsb_read_ratio=0 --ycsb_scan=$SCAN | tee results/$TARGET"_"$RATIO
+#sudo LD_LIBRARY_PATH=$LIBRARY_PATH $BENCH_PATH --ssd_path=$MNT --dram_gib=4 --worker_threads=8 --run_for_seconds=120 --ycsb_tuple_count=$TUPLES --ycsb_read_ratio=0 --ycsb_scan=$SCAN | tee results/$TARGET"_"$RATIO"_"$SCAN
+#sudo LD_LIBRARY_PATH=$LIBRARY_PATH $BENCH_PATH --recover --ssd_path=$MNT --dram_gib=4 --worker_threads=8 --run_for_seconds=120 --ycsb_tuple_count=$TUPLES --ycsb_read_ratio=0 --ycsb_scan=$SCAN | tee results/$TARGET"_"$RATIO"_"$SCAN
+#sudo LD_LIBRARY_PATH=$LIBRARY_PATH $BENCH_PATH --recover --ssd_path=$MNT --dram_gib=4 --worker_threads=8 --run_for_seconds=120 --ycsb_tuple_count=$TUPLES --ycsb_read_ratio=0 --ycsb_scan=$SCAN | tee results/$TARGET"_"$RATIO"_"$SCAN
 #
-#sudo LD_LIBRARY_PATH=$LIBRARY_PATH $BENCH_PATH --recover --ssd_path=$MNT --dram_gib=4 --worker_threads=8 --run_for_seconds=60 --ycsb_tuple_count=8372255 --ycsb_read_ratio=$RATIO --ycsb_scan=$SCAN | tee results/$TARGET"_"$RATIO
-#
+#sudo LD_LIBRARY_PATH=$LIBRARY_PATH $BENCH_PATH --recover --ssd_path=$MNT --dram_gib=4 --worker_threads=8 --run_for_seconds=60 --ycsb_tuple_count=$TUPLES --ycsb_read_ratio=$RATIO --ycsb_scan=$SCAN | tee results/$TARGET"_"$RATIO"_"$SCAN
 #
