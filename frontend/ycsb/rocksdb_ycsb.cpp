@@ -33,7 +33,7 @@ DEFINE_uint32(ycsb_write_type, 3, "");
 DEFINE_bool(print_header, true, "");
 // -------------------------------------------------------------------------------------
 using YCSBKey = u64;
-using YCSBPayload = BytesPayload<1024>;
+using YCSBPayload = BytesPayload<256>;
 using YCSBTable = Relation<YCSBKey, YCSBPayload>;
 // -------------------------------------------------------------------------------------
 thread_local rocksdb::Transaction* RocksDB::txn = nullptr;
@@ -79,16 +79,16 @@ int main(int argc, char** argv)
    if(!FLAGS_recover) {
       cout << "Inserting " << ycsb_tuple_count << " values" << endl;
       begin = chrono::high_resolution_clock::now();
-   //   leanstore::utils::Parallelize::range(FLAGS_worker_threads, ycsb_tuple_count, [&](u64 t_i, u64 begin, u64 end) {
-   //     for (u64 i = begin; i < end; i++) {
-   //       YCSBPayload payload;
-   //       leanstore::utils::RandomGenerator::getRandString(reinterpret_cast<u8*>(&payload), sizeof(YCSBPayload));
-   //       YCSBKey& key = i;
-   //       rocks_db.startTX();
-   //       table.insert({key}, {payload});
-   //       rocks_db.commitTX();
-   //     }
-   //   });
+      // leanstore::utils::Parallelize::range(FLAGS_worker_threads, ycsb_tuple_count, [&](u64 t_i, u64 begin, u64 end) {
+      //    for (u64 i = begin; i < end; i++) {
+      //       YCSBPayload payload;
+      //       leanstore::utils::RandomGenerator::getRandString(reinterpret_cast<u8*>(&payload), sizeof(YCSBPayload));
+      //       YCSBKey& key = i;
+      //       rocks_db.startTX();
+      //       table.insert({key}, {payload});
+      //       rocks_db.commitTX();
+      //    }
+      // });
       leanstore::utils::Parallelize::parallelRange(ycsb_tuple_count, [&](u64 begin, u64 end) {
          for (u64 i = begin; i < end; i++) {
             YCSBPayload payload;
@@ -159,8 +159,8 @@ int main(int argc, char** argv)
                   if (FLAGS_ycsb_write_type == 1) { // Update
                      table.insert({key}, {result});
                   } else if (FLAGS_ycsb_write_type == 2) { // Insert
-                     YCSBKey random_key = leanstore::utils::RandomGenerator::getRandU64(0, 100000000);
-                     u64 random_prefix = leanstore::utils::RandomGenerator::getRandU64(1, 100);
+                     YCSBKey random_key = leanstore::utils::RandomGenerator::getRandU64(0, 100000000000);
+                     u64 random_prefix = leanstore::utils::RandomGenerator::getRandU64(1, 16);
                      table.insert1({random_key}, {result}, random_prefix);
                   } else { // Read-Modify-Write
                      UpdateDescriptorGenerator1(tabular_update_descriptor, YCSBTable, my_payload);
