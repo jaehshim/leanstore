@@ -67,8 +67,8 @@ int main(int argc, char** argv)
    if(!FLAGS_recover) {
       cout << "Inserting " << ycsb_tuple_count << " values" << endl;
       begin = chrono::high_resolution_clock::now();
-   //   leanstore::utils::Parallelize::range(FLAGS_worker_threads, ycsb_tuple_count, [&](u64 t_i, u64 begin, u64 end) {
-   //     wiredtiger_db.prepareThread();
+     //   leanstore::utils::Parallelize::range(FLAGS_worker_threads, ycsb_tuple_count, [&](u64 t_i, u64 begin, u64 end) {
+//     wiredtiger_db.prepareThread();
    //     for (u64 i = begin; i < end; i++) {
    //       YCSBPayload payload;
    //       leanstore::utils::RandomGenerator::getRandString(reinterpret_cast<u8*>(&payload), sizeof(YCSBPayload));
@@ -77,15 +77,15 @@ int main(int argc, char** argv)
    //     }
    //   });
       leanstore::utils::Parallelize::parallelRange(ycsb_tuple_count, [&](u64 begin, u64 end) {
-         wiredtiger_db.prepareThread();
-         for (u64 i = begin; i < end; i++) {
-            YCSBPayload payload;
-            leanstore::utils::RandomGenerator::getRandString(reinterpret_cast<u8*>(&payload), sizeof(YCSBPayload));
-            YCSBKey& key = i;
-            table.insert({key}, {payload});
-         }
-      });
-      end = chrono::high_resolution_clock::now();
+       wiredtiger_db.prepareThread();
+       for (u64 i = begin; i < end; i++) {
+         YCSBPayload payload;
+         leanstore::utils::RandomGenerator::getRandString(reinterpret_cast<u8*>(&payload), sizeof(YCSBPayload));
+         YCSBKey& key = i;
+         table.insert({key}, {payload});
+       }
+     });
+            end = chrono::high_resolution_clock::now();
       cout << "time elapsed = " << (chrono::duration_cast<chrono::microseconds>(end - begin).count() / 1000000.0) << endl;
       cout << calculateMTPS(begin, end, ycsb_tuple_count) << " M tps" << endl;
    }
@@ -110,7 +110,6 @@ int main(int argc, char** argv)
       // -------------------------------------------------------------------------------------
       threads.emplace_back([&, t_i] {
          running_threads_counter++;
-         u64 insert_counter = ycsb_tuple_count;
          wiredtiger_db.prepareThread();
          while (keep_running) {
             jumpmuTry()
@@ -147,9 +146,9 @@ int main(int argc, char** argv)
                   if (FLAGS_ycsb_write_type == 1) { // Update
                      table.insert({key}, {result});
                   } else if (FLAGS_ycsb_write_type == 2) { // Insert
-                     YCSBKey& insert_key = insert_counter;
-                     table.insert1({insert_key}, {result}, t_i);
-                     insert_counter++;
+                     YCSBKey random_key = leanstore::utils::RandomGenerator::getRandU64(0, 100000000);
+                     u64 random_prefix = leanstore::utils::RandomGenerator::getRandU64(1, 100);
+                     table.insert1({random_key}, {result}, random_prefix);
                   } else { // Read-Modify-Write
                      UpdateDescriptorGenerator1(tabular_update_descriptor, YCSBTable, my_payload);
                      table.update1(

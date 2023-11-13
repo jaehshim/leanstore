@@ -124,7 +124,6 @@ int main(int argc, char** argv)
       // -------------------------------------------------------------------------------------
       threads.emplace_back([&, t_i] {
          running_threads_counter++;
-         u64 insert_counter = ycsb_tuple_count;
          while (keep_running) {
             jumpmuTry()
             {
@@ -160,9 +159,9 @@ int main(int argc, char** argv)
                   if (FLAGS_ycsb_write_type == 1) { // Update
                      table.insert({key}, {result});
                   } else if (FLAGS_ycsb_write_type == 2) { // Insert
-                     YCSBKey& insert_key = insert_counter;
-                     table.insert1({insert_key}, {result}, t_i);
-                     insert_counter++;
+                     YCSBKey random_key = leanstore::utils::RandomGenerator::getRandU64(0, 100000000);
+                     u64 random_prefix = leanstore::utils::RandomGenerator::getRandU64(1, 100);
+                     table.insert1({random_key}, {result}, random_prefix);
                   } else { // Read-Modify-Write
                      UpdateDescriptorGenerator1(tabular_update_descriptor, YCSBTable, my_payload);
                      table.update1(
